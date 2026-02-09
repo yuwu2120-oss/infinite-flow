@@ -87,17 +87,25 @@ else:
         if god_command:
             st.session_state.history.append({"role": "user", "content": f"**神谕：** {god_command}"})
 
-        # --- 作家 AI ---
+        # --- 作家 AI (修改版：强制使用名字) ---
         writer_prompt = f"""
         你是一个无限流小说家。副本：{scenario}。
-        A：{player_a}。B：{player_b}。
+        
+        【角色档案】：
+        1. {player_a}
+        2. {player_b}
+        
         当前羁绊：{st.session_state.bond}。
-        【前情】：{memory_text}
-        【指令】：{instruction}
-        【要求】：写300字以内的精彩剧情。
+        【前情回顾】：{memory_text}
+        【本回合神谕】：{instruction}
+        
+        【写作要求】：
+        1. 写300字以内的精彩剧情。
+        2. ⚠️ 严禁使用“A”、“B”、“玩家A”这样的代号！请直接从上面的【角色档案】中提取他们的名字（例如你填了“哈利波特”，就必须写“哈利波特”）。
+        3. 如果神谕为空，请自动推动剧情发展，制造危机或互动。
         """
 
-        with st.spinner("命运计算中..."):
+        with st.spinner("命运改写中..."):
             try:
                 response = client.chat.completions.create(
                     model="deepseek-chat",
@@ -140,5 +148,6 @@ else:
             except Exception as e:
 
                 st.error(f"Error: {e}")
+
 
 
