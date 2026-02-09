@@ -41,7 +41,7 @@ with st.sidebar:
     is_started = len(st.session_state.history) > 0
     player_a = st.text_input("玩家A", value="叶凡（腹黑，修仙）", disabled=is_started)
     player_b = st.text_input("玩家B", value="Eve（傲娇，大小姐）", disabled=is_started)
-    scenario = st.selectbox("副本", ["丧尸围城的超市", "午夜的泰坦尼克号", "修仙界的兽潮"], disabled=is_started)
+    scenario = st.selectbox("副本", ["丧尸围城的超市", "午夜的泰坦尼克号", "修仙界的兽潮", "西方魔法世界"], disabled=is_started)
     
     if st.button("🔄 重置世界"):
         st.session_state.clear()
@@ -138,4 +138,5 @@ else:
                 
                 st.rerun()
             except Exception as e:
+
                 st.error(f"Error: {e}")
