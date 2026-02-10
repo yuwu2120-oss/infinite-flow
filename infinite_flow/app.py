@@ -1,6 +1,8 @@
 import streamlit as st
 from openai import OpenAI
 import json
+import urllib.parse
+import random # <--- 新增：随机数库，用来绕过缓存
 
 # --- 1. 配置 ---
 st.set_page_config(page_title="凡人世界 Pro", page_icon="⚔️", layout="wide")
@@ -29,6 +31,8 @@ st.markdown("""
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         font-weight: 500;
     }
+    /* 修复图片圆角，让它看起来更像插图 */
+    .stImage > img { border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
     p, h1, h2, h3, .stMarkdown { color: #1a1a1a !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -61,7 +65,7 @@ with st.sidebar:
     is_started = len(st.session_state.history) > 0
     player_a = st.text_input("主角名", value="叶凡", disabled=is_started)
     player_b = st.text_input("同伴名", value="Eve", disabled=is_started)
-    scenario = st.selectbox("选择副本", ["丧尸围城的超市", "午夜的泰坦尼克号", "修仙界的兽潮", "赛博朋克不夜城"], disabled=is_started)
+    scenario = st.selectbox("选择副本", ["丧尸围城的超市", "始皇陵", "修仙界的兽潮", "赛博朋克不夜城"], disabled=is_started)
     
     if st.button("🔄 重置世界"):
         st.session_state.clear()
@@ -74,7 +78,6 @@ for chat in st.session_state.history:
     avatar = "⚡️" if chat["role"] == "user" else "🤖"
     with st.chat_message(chat["role"], avatar=avatar):
         st.markdown(chat["content"])
-        # 如果历史记录里有图片，就显示出来
         if "image_url" in chat:
             st.image(chat["image_url"], use_container_width=True)
 
@@ -99,7 +102,7 @@ if not st.session_state.game_over:
         if god_command:
             st.session_state.history.append({"role": "user", "content": f"**神谕：** {god_command}"})
 
-        with st.spinner("剧情生成中..."):
+        with st.spinner("命运生成中..."):
             # 1. 写故事
             story_prompt = f"""
             你是一个无限流游戏DM。副本：{scenario}。
@@ -120,20 +123,20 @@ if not st.session_state.game_over:
                 )
                 story_content = story_res.choices[0].message.content
                 
-                # 2. 算数值 + 生成画图指令 (关键升级)
+                # 2. 算数值 + 生成画图指令
                 logic_prompt = f"""
                 阅读剧情：'''{story_content}'''
                 
                 请完成两件事：
                 1. 分析数值变化 (HP, 羁绊, 物品)。
-                2. 将这段剧情概括为一句【英文绘画提示词】(image_prompt)，用于生成插图。描述要具体，包含风格（如 cinematic, dark, fantasy）。
+                2. 将剧情概括为一句【英文绘画提示词】(image_prompt)。包含风格（如 cinematic, 8k, dark lighting）。
                 
                 严格输出 JSON 格式：
                 {{
                     "hp_change": 0,
                     "bond_change": 0,
                     "new_item": null,
-                    "image_prompt": "A cinematic shot of a zombie standing in dark supermarket aisle, holding an axe, 8k resolution"
+                    "image_prompt": "A cinematic shot of..."
                 }}
                 """
                 
@@ -143,7 +146,6 @@ if not st.session_state.game_over:
                     stream=False
                 )
                 
-                # 清洗并解析 JSON
                 clean_json = logic_res.choices[0].message.content.replace("```json", "").replace("```", "").strip()
                 data = json.loads(clean_json)
                 
@@ -157,18 +159,18 @@ if not st.session_state.game_over:
                 new_item = data.get("new_item")
                 if new_item: st.session_state.inventory.append(new_item)
 
-                # --- 3. 生成图片 (魔法时刻) ---
+                # --- 3. 生成图片 (防封号修复版) ---
                 image_prompt = data.get("image_prompt", f"{scenario} scene, cinematic")
-                # 对 Prompt 进行 URL 编码
-                import urllib.parse
                 encoded_prompt = urllib.parse.quote(image_prompt)
-                image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=512&nologo=true"
+                
+                # 关键修改：加入随机种子(seed) 和 模型参数(flux)
+                seed = random.randint(0, 100000) 
+                image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=512&nologo=true&seed={seed}&model=flux"
 
-                # 保存到历史记录
                 st.session_state.history.append({
                     "role": "assistant", 
                     "content": story_content,
-                    "image_url": image_url  # 把图片地址存进去
+                    "image_url": image_url
                 })
                 
                 st.session_state.turn += 1
