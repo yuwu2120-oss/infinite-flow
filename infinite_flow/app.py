@@ -14,54 +14,53 @@ except Exception:
 
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
-# --- CSS 修复版 (高对比度) ---
+# --- CSS 风格：清爽小说风 (绝对清晰) ---
 st.markdown("""
 <style>
-    /* 1. 全局配置 */
+    /* 1. 全局背景 - 柔和的纸张白 */
     .stApp {
-        background-color: #0e1117; /* 深空灰背景 */
-        color: #ffffff; /* 全局白字 */
+        background-color: #f9f9f9;
+        color: #333333;
     }
     
-    /* 2. 暴力强制修改所有文本颜色 (解决看不清的问题) */
-    p, .stMarkdown, div[data-testid="stMarkdownContainer"] {
-        color: #ffffff !important;
-    }
-
-    /* 3. 聊天气泡 - 增加辨识度 */
-    div[data-testid="stChatMessage"] {
-        padding: 15px;
-        border-radius: 10px;
-        margin-bottom: 10px;
-        color: #ffffff !important; /* 气泡内文字强制白 */
-    }
-    
-    /* 主角气泡：深蓝色背景 */
-    div[data-testid="stChatMessage"]:nth-child(odd) {
-        background-color: #172554; 
-        border: 1px solid #3b82f6;
-    }
-    
-    /* AI气泡：深灰色背景 */
-    div[data-testid="stChatMessage"]:nth-child(even) {
-        background-color: #262626; 
-        border: 1px solid #525252;
-    }
-
-    /* 4. 侧边栏 */
+    /* 2. 侧边栏 - 浅灰磨砂质感 */
     section[data-testid="stSidebar"] {
-        background-color: #1a1c24;
+        background-color: #f0f2f6;
+        border-right: 1px solid #e5e5e5;
     }
     
-    /* 5. 物品栏样式 */
+    /* 3. 聊天气泡 - 卡片式设计 */
+    div[data-testid="stChatMessage"] {
+        background-color: #ffffff; /* 纯白卡片 */
+        border-radius: 12px;
+        padding: 15px;
+        margin-bottom: 15px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05); /* 淡淡的阴影 */
+        border: 1px solid #eee;
+        color: #333 !important; /* 强制深色文字 */
+    }
+    
+    /* 主角气泡：淡蓝色背景 (区分度高) */
+    div[data-testid="stChatMessage"]:nth-child(odd) {
+        background-color: #e3f2fd; 
+        border: 1px solid #bbdefb;
+    }
+    
+    /* 4. 物品栏 - 游戏道具感 */
     .inventory-item {
-        background-color: #334155;
-        color: #fbbf24 !important; /* 金色字体 */
-        padding: 5px 10px;
-        border-radius: 5px;
-        margin-bottom: 5px;
-        border: 1px solid #f59e0b;
-        font-family: monospace;
+        background-color: #ffffff;
+        color: #444 !important;
+        padding: 8px 12px;
+        border-radius: 6px;
+        margin-bottom: 8px;
+        border-left: 4px solid #3b82f6; /* 蓝色竖条装饰 */
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        font-weight: 500;
+    }
+
+    /* 5. 强制修正所有字体颜色，防止看不清 */
+    p, h1, h2, h3, .stMarkdown {
+        color: #1a1a1a !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -221,5 +220,6 @@ if not st.session_state.game_over:
                 # 如果 AI 偶尔发疯，我们不仅报错，还打印出来方便调试
                 print(f"Logic Error: {e}")
                 st.rerun()
+
 
 
