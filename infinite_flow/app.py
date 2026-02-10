@@ -1,9 +1,9 @@
 import streamlit as st
 from openai import OpenAI
-import json  # 专门用来处理数据的库
+import json
 
 # --- 1. 配置 ---
-st.set_page_config(page_title="凡人世界 Pro", page_icon="⚔️", layout="wide")
+st.set_page_config(page_title="凡人世界：灵魂试炼", page_icon="🧬", layout="wide")
 
 try:
     API_KEY = st.secrets["API_KEY"]
@@ -14,36 +14,40 @@ except Exception:
 
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
-# --- CSS 风格：清爽小说风 (绝对清晰) ---
+# --- CSS: 极简未来风 (Social App 质感) ---
 st.markdown("""
 <style>
-    /* 1. 全局背景 - 柔和的纸张白 */
-    .stApp {
-        background-color: #f9f9f9;
-        color: #333333;
+    .stApp { background-color: #f8f9fa; color: #212529; }
+    section[data-testid="stSidebar"] { background-color: #ffffff; border-right: 1px solid #dee2e6; }
+    
+    /* 战报卡片样式 */
+    .soul-card {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        margin-top: 20px;
+        margin-bottom: 20px;
+        text-align: center;
+    }
+    .soul-title { font-size: 1.5em; font-weight: bold; margin-bottom: 10px; }
+    .soul-tag { 
+        background-color: rgba(255,255,255,0.2); 
+        padding: 5px 10px; 
+        border-radius: 20px; 
+        font-size: 0.9em; 
+        display: inline-block;
+        margin: 5px;
     }
     
-    /* 2. 侧边栏 - 浅灰磨砂质感 */
-    section[data-testid="stSidebar"] {
-        background-color: #f0f2f6;
-        border-right: 1px solid #e5e5e5;
-    }
-    
-    /* 3. 物品栏 - 游戏道具感 */
-    .inventory-item {
-        background-color: #ffffff;
-        color: #444 !important;
-        padding: 8px 12px;
-        border-radius: 6px;
-        margin-bottom: 8px;
-        border-left: 4px solid #3b82f6; /* 蓝色竖条装饰 */
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        font-weight: 500;
-    }
-
-    /* 4. 强制修正所有字体颜色，防止看不清 */
-    p, h1, h2, h3, .stMarkdown {
-        color: #1a1a1a !important;
+    /* 聊天气泡 */
+    div[data-testid="stChatMessage"] {
+        background-color: white;
+        border-radius: 12px;
+        padding: 15px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        border: 1px solid #eee;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -51,152 +55,159 @@ st.markdown("""
 # --- 初始化 ---
 if "history" not in st.session_state: st.session_state.history = []
 if "turn" not in st.session_state: st.session_state.turn = 1
-if "bond" not in st.session_state: st.session_state.bond = 50
 if "hp" not in st.session_state: st.session_state.hp = 100
-if "inventory" not in st.session_state: st.session_state.inventory = []
+if "attributes" not in st.session_state: 
+    # 六维图谱 (0-100)
+    st.session_state.attributes = {"勇气": 50, "智慧": 50, "冷血": 50} 
 if "game_over" not in st.session_state: st.session_state.game_over = False
+if "final_report" not in st.session_state: st.session_state.final_report = None
 
 # --- 侧边栏 ---
 with st.sidebar:
-    st.title("⚔️ 凡人世界 Pro")
+    st.title("🧬 凡人世界 | 灵魂试炼")
+    st.caption("Alpha v2.6 - Social Edition")
     
-    # 血条
-    st.write(f"🩸 **主角生命值: {st.session_state.hp}/100**")
+    # 实时属性雷达 (简化版)
+    st.write("📊 **当前人格倾向**")
+    st.progress(st.session_state.attributes["勇气"] / 100)
+    st.caption(f"🦁 勇气: {st.session_state.attributes['勇气']}")
+    st.progress(st.session_state.attributes["智慧"] / 100)
+    st.caption(f"🧠 智慧: {st.session_state.attributes['智慧']}")
+    st.progress(st.session_state.attributes["冷血"] / 100)
+    st.caption(f"❄️ 冷血: {st.session_state.attributes['冷血']}")
+    
+    st.divider()
+    
+    # 生命值
+    st.write(f"🩸 **生命值: {st.session_state.hp}/100**")
     st.progress(min(100, max(0, st.session_state.hp)) / 100)
     
-    # 羁绊
-    st.write(f"❤️ **双人羁绊值: {st.session_state.bond}**")
-    st.progress(min(100, max(0, st.session_state.bond)) / 100)
-    
-    # 背包 (修复显示问题)
     st.divider()
-    st.write("🎒 **物品栏**")
-    if st.session_state.inventory:
-        for item in st.session_state.inventory:
-            st.markdown(f"<div class='inventory-item'>📦 {item}</div>", unsafe_allow_html=True)
-    else:
-        st.caption("空空如也...")
-
-    st.divider()
-    
     is_started = len(st.session_state.history) > 0
-    player_a = st.text_input("主角名", value="叶凡", disabled=is_started)
-    player_b = st.text_input("同伴名", value="Eve", disabled=is_started)
-    scenario = st.selectbox(
-        "选择副本", 
-        ["丧尸围城的超市", "午夜的泰坦尼克号", "修仙界的兽潮", "赛博朋克不夜城", "克苏鲁深海考察站"], 
-        disabled=is_started
-    )
+    player_name = st.text_input("你的名字", value="玩家1", disabled=is_started)
+    scenario = st.selectbox("选择试炼副本", ["丧尸围城", "泰坦尼克号", "修仙界", "赛博朋克"], disabled=is_started)
     
-    if st.button("🔄 重置世界"):
+    if st.button("🔄 重启时间线"):
         st.session_state.clear()
         st.rerun()
 
 # --- 主界面 ---
 st.header(f"当前副本：{scenario}")
 
+# 历史记录
 for chat in st.session_state.history:
-    avatar = "⚡️" if chat["role"] == "user" else "🤖"
+    avatar = "👤" if chat["role"] == "user" else "🤖"
     with st.chat_message(chat["role"], avatar=avatar):
         st.markdown(chat["content"])
 
-# --- 游戏结束判定 ---
-if st.session_state.hp <= 0:
-    st.error(f"💀 **BAD END：{player_a} 牺牲了...**")
-    st.session_state.game_over = True
+# --- 游戏逻辑 ---
 
-# --- 核心逻辑区 ---
-if not st.session_state.game_over:
+# 1. 游戏结束显示战报 (核心社交功能)
+if st.session_state.game_over and st.session_state.final_report:
+    report = st.session_state.final_report
+    
+    st.markdown("---")
+    st.markdown(f"""
+    <div class="soul-card">
+        <div class="soul-title">💀 灵魂观测报告 💀</div>
+        <p>受试者：{player_name}</p>
+        <p>结局：{report['ending']}</p>
+        <div>
+            <span class="soul-tag">🦁 勇气 {report['stats']['勇气']}</span>
+            <span class="soul-tag">🧠 智慧 {report['stats']['智慧']}</span>
+            <span class="soul-tag">❄️ 冷血 {report['stats']['冷血']}</span>
+        </div>
+        <hr style="border-color: rgba(255,255,255,0.3);">
+        <p style="font-style: italic;">"{report['comment']}"</p>
+        <p style="font-size: 0.8em; margin-top: 15px;">🔍 凡人世界 · Infinite Flow Social</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.info("💡 **长按截图或复制上方文字，发给朋友挑战你的生存记录！**")
+
+# 2. 游戏进行中
+elif not st.session_state.game_over:
+    if st.session_state.hp <= 0:
+        st.session_state.game_over = True
+        st.rerun()
+
     st.markdown("---")
     with st.form(key="game_form", clear_on_submit=True):
-        col1, col2 = st.columns([4, 1])
-        with col1:
-            god_command = st.text_input("⚡️ 降下神谕", placeholder="输入行动...")
-        with col2:
-            submit_btn = st.form_submit_button(f"🎬 第 {st.session_state.turn} 回合")
+        user_input = st.text_input("⚡️ 做出你的抉择...", placeholder="你打算怎么做？")
+        submit_btn = st.form_submit_button(f"🎬 第 {st.session_state.turn} 回合")
     
-    if submit_btn:
-        # 1. 记录输入
-        memory_text = "\n".join([f"{'【主神】' if c['role']=='user' else '【剧情】'}: {c['content']}" for c in st.session_state.history[-4:]]) # 只读最近4条，省钱且快
-        instruction = f"【主神指令】：{god_command}" if god_command else "继续剧情，制造危机。"
+    if submit_btn and user_input:
+        # 记录
+        st.session_state.history.append({"role": "user", "content": user_input})
         
-        if god_command:
-            st.session_state.history.append({"role": "user", "content": f"**神谕：** {god_command}"})
-
-        # 2. Story AI (负责写文)
+        # 构建 Prompt
+        memory = "\n".join([f"{c['role']}: {c['content']}" for c in st.session_state.history[-4:]])
+        
         with st.spinner("命运计算中..."):
+            # A. 剧情生成
             story_prompt = f"""
-            你是一个无限流游戏DM。副本：{scenario}。
-            主角：{player_a} (HP:{st.session_state.hp})。同伴：{player_b}。
-            背包：{st.session_state.inventory}。
+            你是一个无限流游戏AI。副本：{scenario}。主角：{player_name} (HP:{st.session_state.hp})。
+            前情：{memory}
+            玩家行动：{user_input}
             
-            【前情】：{memory_text}
-            【指令】：{instruction}
-            
-            要求：200字内。如果HP低，描述受伤。如果获得物品，明确描述发现过程。
+            请输出简短精彩的剧情结果(100字内)。如果必死，直接写死。
             """
+            story_res = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[{"role": "user", "content": story_prompt}]
+            )
+            story_content = story_res.choices[0].message.content
+            st.session_state.history.append({"role": "assistant", "content": story_content})
             
+            # B. 数值与人格分析 (Data Mining)
+            logic_prompt = f"""
+            阅读剧情：{story_content}
+            分析主角的行为，调整属性。
+            JSON格式：
+            {{
+                "hp_change": 0,
+                "courage_change": 0, (勇气变化 -10到10)
+                "wisdom_change": 0, (智慧变化 -10到10)
+                "cold_change": 0 (冷血变化 -10到10)
+            }}
+            """
+            logic_res = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[{"role": "user", "content": logic_prompt}]
+            )
             try:
-                story_res = client.chat.completions.create(
-                    model="deepseek-chat",
-                    messages=[{"role": "user", "content": story_prompt}],
-                    stream=False
-                )
-                story_content = story_res.choices[0].message.content
-                st.session_state.history.append({"role": "assistant", "content": story_content})
+                data = json.loads(logic_res.choices[0].message.content.replace("```json", "").replace("```", ""))
                 
-                # 3. Logic AI (数学脑 - 强力升级版)
-                logic_prompt = f"""
-                阅读剧情：'''{story_content}'''
+                # 更新数值
+                st.session_state.hp = max(0, min(100, st.session_state.hp + data.get("hp_change", 0)))
+                st.session_state.attributes["勇气"] = max(0, min(100, st.session_state.attributes["勇气"] + data.get("courage_change", 0)))
+                st.session_state.attributes["智慧"] = max(0, min(100, st.session_state.attributes["智慧"] + data.get("wisdom_change", 0)))
+                st.session_state.attributes["冷血"] = max(0, min(100, st.session_state.attributes["冷血"] + data.get("cold_change", 0)))
                 
-                请分析主角的状态变化，并必须以严格的 JSON 格式输出。
+                # 判定结束
+                if st.session_state.hp <= 0 or st.session_state.turn >= 10: # 10回合强制结算，方便测试
+                    st.session_state.game_over = True
+                    # C. 生成最终战报 (The Social Asset)
+                    report_prompt = f"""
+                    玩家 {player_name} 结束了游戏。
+                    最终属性：{st.session_state.attributes}。
+                    结局剧情：{story_content}。
+                    
+                    请生成一个JSON战报：
+                    {{
+                        "ending": "给结局起个中二的标题 (如：深海的殉道者)",
+                        "comment": "一句犀利的性格评价 (如：你太善良了，在这个世界活不过3分钟)",
+                        "stats": {st.session_state.attributes}
+                    }}
+                    """
+                    report_res = client.chat.completions.create(
+                        model="deepseek-chat",
+                        messages=[{"role": "user", "content": report_prompt}]
+                    )
+                    st.session_state.final_report = json.loads(report_res.choices[0].message.content.replace("```json", "").replace("```", ""))
                 
-                格式模板：
-                {{
-                    "hp_change": -10,  (整数：扣血为负，回血为正，无变化为0)
-                    "bond_change": 5,  (整数：关系变好正，变坏负，无变化0)
-                    "new_item": "医疗包" (字符串：如果没有获得新物品，必须填 null)
-                }}
-                
-                注意：只输出 JSON，不要包含任何 markdown 标记（如 ```json）。
-                """
-                
-                logic_res = client.chat.completions.create(
-                    model="deepseek-chat",
-                    messages=[{"role": "user", "content": logic_prompt}],
-                    stream=False
-                )
-                logic_text = logic_res.choices[0].message.content
-                
-                # 清洗数据（防止 AI 加了 ```json 前缀）
-                clean_json = logic_text.replace("```json", "").replace("```", "").strip()
-                
-                # 4. 解析数据并更新 (最关键的一步)
-                data = json.loads(clean_json)
-                
-                # 更新血量
-                hp_delta = data.get("hp_change", 0)
-                if hp_delta != 0:
-                    st.session_state.hp += hp_delta
-                    if hp_delta < 0: st.toast(f"🩸 受到伤害 {hp_delta}", icon="🤕")
-                    else: st.toast(f"💚 恢复生命 +{hp_delta}", icon="💊")
-                
-                # 更新羁绊
-                bond_delta = data.get("bond_change", 0)
-                if bond_delta != 0:
-                    st.session_state.bond = max(0, min(100, st.session_state.bond + bond_delta))
-                    st.toast(f"❤️ 羁绊变化 {bond_delta}", icon="💞")
-                
-                # 更新背包
-                new_item = data.get("new_item")
-                if new_item:
-                    st.session_state.inventory.append(new_item)
-                    st.toast(f"🎒 获得物品：{new_item}", icon="🎁")
-
                 st.session_state.turn += 1
-                
                 st.rerun()
                 
             except Exception as e:
-                print(f"Logic Error: {e}")
-                st.rerun()
+                st.error(e)
