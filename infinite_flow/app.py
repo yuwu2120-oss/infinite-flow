@@ -28,24 +28,7 @@ st.markdown("""
         background-color: #f0f2f6;
         border-right: 1px solid #e5e5e5;
     }
-    
-    /* 3. 聊天气泡 - 卡片式设计 */
-    div[data-testid="stChatMessage"] {
-        background-color: #ffffff; /* 纯白卡片 */
-        border-radius: 12px;
-        padding: 15px;
-        margin-bottom: 15px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.05); /* 淡淡的阴影 */
-        border: 1px solid #eee;
-        color: #333 !important; /* 强制深色文字 */
-    }
-    
-    /* 主角气泡：淡蓝色背景 (区分度高) */
-    div[data-testid="stChatMessage"]:nth-child(odd) {
-        background-color: #e3f2fd; 
-        border: 1px solid #bbdefb;
-    }
-    
+       
     /* 4. 物品栏 - 游戏道具感 */
     .inventory-item {
         background-color: #ffffff;
@@ -220,6 +203,7 @@ if not st.session_state.game_over:
                 # 如果 AI 偶尔发疯，我们不仅报错，还打印出来方便调试
                 print(f"Logic Error: {e}")
                 st.rerun()
+
 
 
 
