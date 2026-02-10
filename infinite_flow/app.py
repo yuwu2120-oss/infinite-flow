@@ -47,7 +47,7 @@ if "custom_worlds" not in st.session_state:
 
 # --- 侧边栏 ---
 with st.sidebar:
-    st.title("🌍 凡人世界：创世版")
+    st.title("🌍 凡人世界")
     
     # --- 1. 创世引擎 (核心新功能) ---
     with st.expander("🛠️ 创造我的副本", expanded=False):
@@ -59,7 +59,7 @@ with st.sidebar:
             st.caption(f"🎁 新手福利：免费创建次数 ({created_count}/{free_limit})")
             with st.form("create_world_form"):
                 new_world_name = st.text_input("副本名称", placeholder="例如：赛博修仙2077")
-                new_world_desc = st.text_area("世界观设定 (AI将以此为准)", placeholder="例如：这是一个充满霓虹灯的修仙世界，人们用芯片筑基，黑客是最高级的符咒师...")
+                new_world_desc = st.text_area("世界观设定", placeholder="例如：这是一个充满霓虹灯的修仙世界，人们用芯片筑基，黑客是最高级的符咒师...")
                 if st.form_submit_button("✨ 立即创造"):
                     if new_world_name and new_world_desc:
                         st.session_state.custom_worlds[new_world_name] = new_world_desc
@@ -73,8 +73,8 @@ with st.sidebar:
             <div class='creation-card'>
                 <h4>🔒 免费次数已用完</h4>
                 <p>你已创建了 {created_count} 个私有宇宙。</p>
-                <p>解锁<b>无限创造权</b>，仅需 ￥9.9/月</p>
-                <button style='background:#4338ca;color:white;border:none;padding:5px 10px;border-radius:5px;'>💎 立即升级 Pro</button>
+                <p>解锁<b>无限创造权</b></p>
+                <button style='background:#4338ca;color:white;border:none;padding:5px 10px;border-radius:5px;'>💎</button>
             </div>
             """, unsafe_allow_html=True)
 
@@ -225,3 +225,4 @@ if not st.session_state.game_over:
             except Exception as e:
                 print(f"Logic Error: {e}")
                 st.rerun()
+
