@@ -1,7 +1,6 @@
 import streamlit as st
 from openai import OpenAI
 import json
-import urllib.parse
 import random
 
 # --- 1. 配置 ---
@@ -21,6 +20,8 @@ st.markdown("""
 <style>
     .stApp { background-color: #f9f9f9; color: #333333; }
     section[data-testid="stSidebar"] { background-color: #f0f2f6; border-right: 1px solid #e5e5e5; }
+    
+    /* 物品栏样式 */
     .inventory-item {
         background-color: #ffffff;
         color: #444 !important;
@@ -31,7 +32,19 @@ st.markdown("""
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         font-weight: 500;
     }
-    img { border-radius: 10px; margin-top: 10px; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    
+    /* 结局卡片样式 */
+    .ending-card {
+        background-color: #fff1f2;
+        border: 1px solid #fda4af;
+        color: #881337 !important;
+        padding: 10px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+        font-size: 0.9em;
+    }
+
+    /* 修复字体颜色 */
     p, h1, h2, h3, .stMarkdown { color: #1a1a1a !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -43,13 +56,31 @@ if "bond" not in st.session_state: st.session_state.bond = 50
 if "hp" not in st.session_state: st.session_state.hp = 100
 if "inventory" not in st.session_state: st.session_state.inventory = []
 if "game_over" not in st.session_state: st.session_state.game_over = False
+# 新增：结局收藏夹
+if "endings" not in st.session_state: st.session_state.endings = [] 
 
 # --- 侧边栏 ---
 with st.sidebar:
     st.title("⚔️ 凡人世界 Pro")
-    st.write(f"🩸 **主角生命值: {st.session_state.hp}/100**")
+    
+    # 1. 动态头像展示 (DiceBear API - 绝对稳定)
+    col_a, col_b = st.columns(2)
+    is_started = len(st.session_state.history) > 0
+    player_a = st.text_input("主角名", value="叶凡", disabled=is_started)
+    player_b = st.text_input("同伴名", value="Eve", disabled=is_started)
+
+    with col_a:
+        # 使用 adventurer 风格生成 RPG 头像
+        st.image(f"https://api.dicebear.com/9.x/adventurer/svg?seed={player_a}&backgroundColor=b6e3f4", caption=player_a)
+    with col_b:
+        st.image(f"https://api.dicebear.com/9.x/adventurer/svg?seed={player_b}&backgroundColor=ffdfbf", caption=player_b)
+
+    st.divider()
+    
+    # 2. 状态栏
+    st.write(f"🩸 **生命值: {st.session_state.hp}/100**")
     st.progress(min(100, max(0, st.session_state.hp)) / 100)
-    st.write(f"❤️ **双人羁绊值: {st.session_state.bond}**")
+    st.write(f"❤️ **羁绊值: {st.session_state.bond}**")
     st.progress(min(100, max(0, st.session_state.bond)) / 100)
     
     st.divider()
@@ -60,18 +91,23 @@ with st.sidebar:
     else:
         st.caption("空空如也...")
 
+    # 3. 结局图鉴 (新功能)
+    if st.session_state.endings:
+        st.divider()
+        st.write("🏆 **已达成结局**")
+        for end in st.session_state.endings:
+            st.markdown(f"<div class='ending-card'>{end}</div>", unsafe_allow_html=True)
+
     st.divider()
-    # --- 新增：配图开关 (如果报错可以关掉) ---
-    enable_image = st.checkbox("🖼️ 开启AI配图", value=True, help="如果出现二维码或报错，请关闭此选项")
-    
-    st.divider()
-    is_started = len(st.session_state.history) > 0
-    player_a = st.text_input("主角名", value="叶凡", disabled=is_started)
-    player_b = st.text_input("同伴名", value="Eve", disabled=is_started)
-    scenario = st.selectbox("选择副本", ["丧尸围城的超市", "午夜的泰坦尼克号", "修仙界的兽潮", "赛博朋克不夜城", "秦始皇陵"], disabled=is_started)
+    scenario = st.selectbox("选择副本", ["丧尸围城的超市", "午夜的泰坦尼克号", "修仙界的兽潮", "赛博朋克不夜城"], disabled=is_started)
     
     if st.button("🔄 重置世界"):
-        st.session_state.clear()
+        st.session_state.history = []
+        st.session_state.turn = 1
+        st.session_state.bond = 50
+        st.session_state.hp = 100
+        st.session_state.inventory = []
+        st.session_state.game_over = False
         st.rerun()
 
 # --- 主界面 ---
@@ -81,14 +117,28 @@ for chat in st.session_state.history:
     avatar = "⚡️" if chat["role"] == "user" else "🤖"
     with st.chat_message(chat["role"], avatar=avatar):
         st.markdown(chat["content"])
-        # 只有当开关开启，且有图片链接时才显示
-        if enable_image and "image_url" in chat:
-            st.markdown(f"![剧情配图]({chat['image_url']})")
 
 # --- 游戏逻辑 ---
-if st.session_state.hp <= 0:
-    st.error(f"💀 **BAD END：{player_a} 牺牲了...**")
-    st.session_state.game_over = True
+if not st.session_state.game_over:
+    # 检查是否达成结局
+    ending_title = ""
+    if st.session_state.hp <= 0:
+        ending_title = f"💀 BAD END：{player_a} 战死沙场"
+        st.error(ending_title)
+        st.session_state.game_over = True
+    elif st.session_state.bond <= 0:
+        ending_title = f"💔 BAD END：{player_a} 与 {player_b} 决裂"
+        st.error(ending_title)
+        st.session_state.game_over = True
+    elif st.session_state.bond >= 100:
+        ending_title = f"❤️ HAPPY END：灵魂伴侣"
+        st.success(ending_title)
+        st.session_state.game_over = True
+    
+    # 如果达成结局，且没保存过，就存入侧边栏
+    if ending_title and ending_title not in st.session_state.endings:
+        st.session_state.endings.append(ending_title)
+        st.rerun() # 刷新一下显示侧边栏
 
 if not st.session_state.game_over:
     st.markdown("---")
@@ -127,19 +177,15 @@ if not st.session_state.game_over:
                 )
                 story_content = story_res.choices[0].message.content
                 
-                # 2. Logic AI
+                # 2. Logic AI (不再生成图片，只算数)
                 logic_prompt = f"""
                 阅读剧情：'''{story_content}'''
-                
-                1. 分析数值变化。
-                2. 概括一句【英文绘画提示词】(image_prompt)。
-                
+                分析数值变化。
                 JSON格式：
                 {{
                     "hp_change": 0,
                     "bond_change": 0,
-                    "new_item": null,
-                    "image_prompt": "cinematic shot of..."
+                    "new_item": null
                 }}
                 """
                 
@@ -162,19 +208,9 @@ if not st.session_state.game_over:
                 new_item = data.get("new_item")
                 if new_item: st.session_state.inventory.append(new_item)
 
-                # --- 3. 图片生成 (Turbo模式) ---
-                image_url = ""
-                if enable_image:
-                    image_prompt = data.get("image_prompt", f"{scenario} scene")
-                    encoded_prompt = urllib.parse.quote(image_prompt)
-                    # 关键修改：使用 turbo 模型，去掉 private 参数（减少限制触发）
-                    seed = random.randint(0, 1000000)
-                    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=800&height=400&nologo=true&model=turbo&seed={seed}"
-
                 st.session_state.history.append({
                     "role": "assistant", 
-                    "content": story_content,
-                    "image_url": image_url
+                    "content": story_content
                 })
                 
                 st.session_state.turn += 1
