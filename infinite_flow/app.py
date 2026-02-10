@@ -14,11 +14,56 @@ except Exception:
 
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
-# --- CSS美化 ---
+# --- CSS 豪华装修 (直接贴在 set_page_config 下面) ---
 st.markdown("""
 <style>
-    .stProgress > div > div > div > div { background-color: #ff4b4b; }
-    .report-card {padding: 20px; border-radius: 10px; background-color: #f0f2f6; border-left: 5px solid #ff4b4b;}
+    /* 1. 全局暗黑背景微调 */
+    .stApp {
+        background-color: #0e1117;
+        color: #fafafa;
+    }
+    
+    /* 2. 侧边栏美化 */
+    section[data-testid="stSidebar"] {
+        background-color: #262730;
+        border-right: 1px solid #464b59;
+    }
+    
+    /* 3. 聊天气泡优化 */
+    .stChatMessage {
+        background-color: transparent;
+        border-radius: 10px;
+        padding: 10px;
+        margin-bottom: 10px;
+    }
+    
+    /* 给主角（User）的气泡加个深色背景 */
+    div[data-testid="stChatMessage"]:nth-child(odd) {
+        background-color: #1f2937; /* 深蓝灰色 */
+        border: 1px solid #374151;
+    }
+    
+    /* 给AI（剧情）的气泡加个暗红色微光（更有氛围） */
+    div[data-testid="stChatMessage"]:nth-child(even) {
+        background-color: #2b1d1d; /* 暗红色调 */
+        border: 1px solid #450a0a;
+    }
+
+    /* 4. 进度条颜色 */
+    .stProgress > div > div > div > div {
+        background-image: linear-gradient(to right, #ef4444, #b91c1c);
+    }
+    
+    /* 5. 物品栏卡片 */
+    .inventory-item {
+        background-color: #374151;
+        padding: 5px 10px;
+        border-radius: 5px;
+        margin-bottom: 5px;
+        border-left: 3px solid #f59e0b;
+        font-family: monospace;
+        font-size: 0.9em;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -47,7 +92,7 @@ with st.sidebar:
     st.write("🎒 **物品栏**")
     if st.session_state.inventory:
         for item in st.session_state.inventory:
-            st.caption(f"📦 {item}")
+            st.markdown(f"<div class='inventory-item'>📦 {item}</div>", unsafe_allow_html=True)
     else:
         st.caption("空空如也...")
 
@@ -177,3 +222,4 @@ if not st.session_state.game_over:
                 # 如果 AI 偶尔发疯，我们不仅报错，还打印出来方便调试
                 print(f"Logic Error: {e}")
                 st.rerun()
+
