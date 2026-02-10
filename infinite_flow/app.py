@@ -2,19 +2,21 @@ import streamlit as st
 from openai import OpenAI
 import re
 
-# --- 云端配置 (关键修改) ---
-# 以前我们是直接写 API_KEY = "sk-..."
-# 现在我们告诉代码：去服务器的保险柜(Secrets)里找 Key
+# --- 1. 配置必须放在最前面 ---
+st.set_page_config(page_title="凡人世界", page_icon="💀", layout="wide")
+
+# --- 2. 读取密钥 (带防呆检查) ---
 try:
     API_KEY = st.secrets["API_KEY"]
     BASE_URL = st.secrets["BASE_URL"]
 except FileNotFoundError:
     st.error("❌ 还没有配置 Secrets！请在 Streamlit 后台填入 API Key。")
     st.stop()
+except KeyError:
+    st.error("❌ Secrets 配置有误！请检查变量名是否为 API_KEY 和 BASE_URL。")
+    st.stop()
 
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
-
-st.set_page_config(page_title="凡人世界", page_icon="💀", layout="wide")
 
 # --- CSS美化 ---
 st.markdown("""
@@ -41,7 +43,13 @@ with st.sidebar:
     is_started = len(st.session_state.history) > 0
     player_a = st.text_input("玩家A", value="叶凡（腹黑，修仙）", disabled=is_started)
     player_b = st.text_input("玩家B", value="Eve（傲娇，大小姐）", disabled=is_started)
-    scenario = st.selectbox("副本", ["丧尸围城的超市", "午夜的泰坦尼克号", "西方魔法世界", "修仙界的兽潮"], disabled=is_started)
+    
+    # 你的所有副本都在这里
+    scenario = st.selectbox(
+        "副本", 
+        ["丧尸围城的超市", "秦朝", "修仙界的兽潮", "西方魔法世界"], 
+        disabled=is_started
+    )
     
     if st.button("🔄 重置世界"):
         st.session_state.clear()
@@ -87,7 +95,7 @@ else:
         if god_command:
             st.session_state.history.append({"role": "user", "content": f"**神谕：** {god_command}"})
 
-        # --- 作家 AI (修改版：强制使用名字) ---
+        # --- 作家 AI (这里就是刚才卡住的地方，现在修复了缩进) ---
         writer_prompt = f"""
         你是一个无限流小说家。副本：{scenario}。
         
@@ -101,11 +109,11 @@ else:
         
         【写作要求】：
         1. 写300字以内的精彩剧情。
-        2. ⚠️ 严禁使用“A”、“B”、“玩家A”这样的代号！请直接从上面的【角色档案】中提取他们的名字（例如你填了“哈利波特”，就必须写“哈利波特”）。
+        2. ⚠️ 严禁使用“A”、“B”、“玩家A”这样的代号！请直接从上面的【角色档案】中提取他们的名字（例如你填了“叶凡”，就必须写“叶凡”）。
         3. 如果神谕为空，请自动推动剧情发展，制造危机或互动。
         """
 
-        with st.spinner("命运改写中..."):
+        with st.spinner("命运计算中..."):
             try:
                 response = client.chat.completions.create(
                     model="deepseek-chat",
@@ -146,8 +154,4 @@ else:
                 
                 st.rerun()
             except Exception as e:
-
                 st.error(f"Error: {e}")
-
-
-
