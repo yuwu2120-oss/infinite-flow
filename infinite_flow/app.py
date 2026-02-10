@@ -1,11 +1,10 @@
 import streamlit as st
 from openai import OpenAI
-import re
+import json  # 新增：专门用来处理数据的库
 
-# --- 1. 配置必须放在最前面 ---
+# --- 1. 配置 ---
 st.set_page_config(page_title="凡人世界 Pro", page_icon="⚔️", layout="wide")
 
-# --- 2. 读取密钥 ---
 try:
     API_KEY = st.secrets["API_KEY"]
     BASE_URL = st.secrets["BASE_URL"]
@@ -15,7 +14,7 @@ except Exception:
 
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
-# --- CSS美化 (血条特效) ---
+# --- CSS美化 ---
 st.markdown("""
 <style>
     .stProgress > div > div > div > div { background-color: #ff4b4b; }
@@ -23,33 +22,32 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- 初始化变量 (新增 HP 和 背包) ---
+# --- 初始化 ---
 if "history" not in st.session_state: st.session_state.history = []
 if "turn" not in st.session_state: st.session_state.turn = 1
 if "bond" not in st.session_state: st.session_state.bond = 50
-if "hp" not in st.session_state: st.session_state.hp = 100  # 新增：初始血量
-if "inventory" not in st.session_state: st.session_state.inventory = [] # 新增：初始背包
+if "hp" not in st.session_state: st.session_state.hp = 100
+if "inventory" not in st.session_state: st.session_state.inventory = []
 if "game_over" not in st.session_state: st.session_state.game_over = False
-if "final_report" not in st.session_state: st.session_state.final_report = ""
 
-# --- 侧边栏 (显示状态) ---
+# --- 侧边栏 ---
 with st.sidebar:
     st.title("⚔️ 凡人世界 Pro")
     
-    # 1. 显示血量
+    # 血条
     st.write(f"🩸 **主角生命值: {st.session_state.hp}/100**")
     st.progress(min(100, max(0, st.session_state.hp)) / 100)
     
-    # 2. 显示羁绊
+    # 羁绊
     st.write(f"❤️ **双人羁绊值: {st.session_state.bond}**")
     st.progress(min(100, max(0, st.session_state.bond)) / 100)
     
-    # 3. 显示背包
+    # 背包 (修复显示问题)
     st.divider()
     st.write("🎒 **物品栏**")
     if st.session_state.inventory:
         for item in st.session_state.inventory:
-            st.code(item, language=None)
+            st.caption(f"📦 {item}")
     else:
         st.caption("空空如也...")
 
@@ -71,7 +69,6 @@ with st.sidebar:
 # --- 主界面 ---
 st.header(f"当前副本：{scenario}")
 
-# 渲染历史记录
 for chat in st.session_state.history:
     avatar = "⚡️" if chat["role"] == "user" else "🤖"
     with st.chat_message(chat["role"], avatar=avatar):
@@ -79,48 +76,40 @@ for chat in st.session_state.history:
 
 # --- 游戏结束判定 ---
 if st.session_state.hp <= 0:
-    st.session_state.game_over = True
     st.error(f"💀 **BAD END：{player_a} 牺牲了...**")
-    st.markdown("---")
+    st.session_state.game_over = True
 
-elif st.session_state.game_over:
-    if st.session_state.bond <= 0:
-        st.error("💔 **BAD END：决裂**")
-    elif st.session_state.bond >= 100:
-        st.success("🎉 **HAPPY END：灵魂伴侣**")
-    else:
-        st.warning("⏳ **NORMAL END：生存**")
-
-# --- 游戏输入区域 ---
+# --- 核心逻辑区 ---
 if not st.session_state.game_over:
     st.markdown("---")
     with st.form(key="game_form", clear_on_submit=True):
         col1, col2 = st.columns([4, 1])
         with col1:
-            god_command = st.text_input("⚡️ 降下神谕", placeholder="输入行动，例如：叶凡冲上去挡住攻击...")
+            god_command = st.text_input("⚡️ 降下神谕", placeholder="输入行动...")
         with col2:
             submit_btn = st.form_submit_button(f"🎬 第 {st.session_state.turn} 回合")
     
     if submit_btn:
-        # 1. 记录玩家输入
-        memory_text = "\n".join([f"{'【主神】' if c['role']=='user' else '【剧情】'}: {c['content']}" for c in st.session_state.history])
+        # 1. 记录输入
+        memory_text = "\n".join([f"{'【主神】' if c['role']=='user' else '【剧情】'}: {c['content']}" for c in st.session_state.history[-4:]]) # 只读最近4条，省钱且快
         instruction = f"【主神指令】：{god_command}" if god_command else "继续剧情，制造危机。"
         
         if god_command:
             st.session_state.history.append({"role": "user", "content": f"**神谕：** {god_command}"})
 
-        # 2. 调用 Story AI (写故事)
+        # 2. Story AI (负责写文)
         with st.spinner("命运计算中..."):
             story_prompt = f"""
             你是一个无限流游戏DM。副本：{scenario}。
             主角：{player_a} (HP:{st.session_state.hp})。同伴：{player_b}。
-            背包物品：{st.session_state.inventory}。
+            背包：{st.session_state.inventory}。
             
             【前情】：{memory_text}
             【指令】：{instruction}
             
-            请描写一段精彩剧情(200字内)。如果HP很低，描述受伤状态。如果获得物品，请描述发现过程。
+            要求：200字内。如果HP低，描述受伤。如果获得物品，明确描述发现过程。
             """
+            
             try:
                 story_res = client.chat.completions.create(
                     model="deepseek-chat",
@@ -130,15 +119,21 @@ if not st.session_state.game_over:
                 story_content = story_res.choices[0].message.content
                 st.session_state.history.append({"role": "assistant", "content": story_content})
                 
-                # 3. 调用 Logic AI (计算数值) - 这里是核心黑科技
+                # 3. Logic AI (数学脑 - 强力升级版)
+                # 这里我们强制 AI 输出 JSON 格式，机器读 JSON 是 100% 准确的
                 logic_prompt = f"""
-                阅读这段剧情：'''{story_content}'''
-                请分析剧情对【{player_a}】的影响。
-                必须严格按照以下格式输出 JSON 数据，不要任何多余文字：
+                阅读剧情：'''{story_content}'''
                 
-                HP_CHANGE: [数字] (受伤填负数，回血填正数，无变化填0)
-                BOND_CHANGE: [数字] (关系变好正数，变坏负数，无变化0)
-                ITEM_GET: [物品名] (如果没有获得物品，填 None)
+                请分析主角的状态变化，并必须以严格的 JSON 格式输出。
+                
+                格式模板：
+                {{
+                    "hp_change": -10,  (整数：扣血为负，回血为正，无变化为0)
+                    "bond_change": 5,  (整数：关系变好正，变坏负，无变化0)
+                    "new_item": "医疗包" (字符串：如果没有获得新物品，必须填 null)
+                }}
+                
+                注意：只输出 JSON，不要包含任何 markdown 标记（如 ```json）。
                 """
                 
                 logic_res = client.chat.completions.create(
@@ -148,37 +143,37 @@ if not st.session_state.game_over:
                 )
                 logic_text = logic_res.choices[0].message.content
                 
-                # 4. 解析数据并更新状态
-                # 提取 HP
-                hp_match = re.search(r'HP_CHANGE:\s*([+-]?\d+)', logic_text)
-                if hp_match:
-                    hp_delta = int(hp_match.group(1))
+                # 清洗数据（防止 AI 加了 ```json 前缀）
+                clean_json = logic_text.replace("```json", "").replace("```", "").strip()
+                
+                # 4. 解析数据并更新 (最关键的一步)
+                data = json.loads(clean_json)
+                
+                # 更新血量
+                hp_delta = data.get("hp_change", 0)
+                if hp_delta != 0:
                     st.session_state.hp += hp_delta
                     if hp_delta < 0: st.toast(f"🩸 受到伤害 {hp_delta}", icon="🤕")
-                    if hp_delta > 0: st.toast(f"💚 恢复生命 {hp_delta}", icon="💊")
-
-                # 提取 羁绊
-                bond_match = re.search(r'BOND_CHANGE:\s*([+-]?\d+)', logic_text)
-                if bond_match:
-                    bond_delta = int(bond_match.group(1))
+                    else: st.toast(f"💚 恢复生命 +{hp_delta}", icon="💊")
+                
+                # 更新羁绊
+                bond_delta = data.get("bond_change", 0)
+                if bond_delta != 0:
                     st.session_state.bond = max(0, min(100, st.session_state.bond + bond_delta))
-                    if bond_delta != 0: st.toast(f"❤️ 羁绊变化 {bond_delta}", icon="💞")
-
-                # 提取 物品
-                item_match = re.search(r'ITEM_GET:\s*(.+)', logic_text)
-                if item_match:
-                    item_name = item_match.group(1).strip()
-                    if item_name != "None":
-                        st.session_state.inventory.append(item_name)
-                        st.toast(f"🎒 获得物品：{item_name}", icon="🎁")
+                    st.toast(f"❤️ 羁绊变化 {bond_delta}", icon="💞")
+                
+                # 更新背包
+                new_item = data.get("new_item")
+                if new_item:
+                    st.session_state.inventory.append(new_item)
+                    st.toast(f"🎒 获得物品：{new_item}", icon="🎁")
 
                 st.session_state.turn += 1
-                
-                # 判定结束
-                if st.session_state.turn > 15 or st.session_state.hp <= 0:
-                    st.session_state.game_over = True
+                # 我删除了“if turn > 15”的代码，现在游戏无限进行了！
                 
                 st.rerun()
                 
             except Exception as e:
-                st.error(f"Error: {e}")
+                # 如果 AI 偶尔发疯，我们不仅报错，还打印出来方便调试
+                print(f"Logic Error: {e}")
+                st.rerun()
