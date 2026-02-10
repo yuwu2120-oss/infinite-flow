@@ -3,7 +3,7 @@ from openai import OpenAI
 import json  # 专门用来处理数据的库
 
 # --- 1. 配置 ---
-st.set_page_config(page_title="凡人世界 Pro", page_icon="⚔️", layout="wide")
+st.set_page_config(page_title="凡人世界", page_icon="⚔️", layout="wide")
 
 try:
     API_KEY = st.secrets["API_KEY"]
@@ -83,12 +83,12 @@ with st.sidebar:
     player_a = st.text_input("主角名", value="叶凡", disabled=is_started)
     player_b = st.text_input("同伴名", value="Eve", disabled=is_started)
     scenario = st.selectbox(
-        "选择副本", 
-        ["丧尸围城的超市", "午夜的泰坦尼克号", "修仙界的兽潮", "赛博朋克不夜城", "克苏鲁深海考察站"], 
+        "选择世界", 
+        ["丧尸围城的超市", "汉朝", "西游世界", "秦始皇陵", "深海考察站"], 
         disabled=is_started
     )
     
-    if st.button("🔄 重置世界"):
+    if st.button("🔄 重置时间线"):
         st.session_state.clear()
         st.rerun()
 
@@ -133,7 +133,7 @@ if not st.session_state.game_over:
             【前情】：{memory_text}
             【指令】：{instruction}
             
-            要求：200字内。如果HP低，描述受伤。如果获得物品，明确描述发现过程。
+            要求：300字内。如果HP低，描述受伤。如果获得物品，明确描述发现过程。
             """
             
             try:
@@ -200,3 +200,4 @@ if not st.session_state.game_over:
             except Exception as e:
                 print(f"Logic Error: {e}")
                 st.rerun()
+
