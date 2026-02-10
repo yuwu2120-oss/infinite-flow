@@ -2,7 +2,7 @@ import streamlit as st
 from openai import OpenAI
 import json
 import urllib.parse
-import random # <--- 新增：随机数库，用来绕过缓存
+import random
 
 # --- 1. 配置 ---
 st.set_page_config(page_title="凡人世界 Pro", page_icon="⚔️", layout="wide")
@@ -16,7 +16,7 @@ except Exception:
 
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
-# --- CSS 风格：清爽小说风 ---
+# --- CSS 风格 ---
 st.markdown("""
 <style>
     .stApp { background-color: #f9f9f9; color: #333333; }
@@ -31,8 +31,8 @@ st.markdown("""
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         font-weight: 500;
     }
-    /* 修复图片圆角，让它看起来更像插图 */
-    .stImage > img { border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    /* 图片圆角样式 */
+    img { border-radius: 10px; margin-top: 10px; margin-bottom: 10px; }
     p, h1, h2, h3, .stMarkdown { color: #1a1a1a !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -65,7 +65,7 @@ with st.sidebar:
     is_started = len(st.session_state.history) > 0
     player_a = st.text_input("主角名", value="叶凡", disabled=is_started)
     player_b = st.text_input("同伴名", value="Eve", disabled=is_started)
-    scenario = st.selectbox("选择副本", ["丧尸围城的超市", "始皇陵", "修仙界的兽潮", "赛博朋克不夜城"], disabled=is_started)
+    scenario = st.selectbox("选择副本", ["丧尸围城的超市", "午夜的泰坦尼克号", "修仙界的兽潮", "赛博朋克不夜城"], disabled=is_started)
     
     if st.button("🔄 重置世界"):
         st.session_state.clear()
@@ -79,7 +79,9 @@ for chat in st.session_state.history:
     with st.chat_message(chat["role"], avatar=avatar):
         st.markdown(chat["content"])
         if "image_url" in chat:
-            st.image(chat["image_url"], use_container_width=True)
+            # --- 关键修改：用 Markdown 语法显示图片 ---
+            # 这样会让你的浏览器直接去加载图片，绕过 Streamlit 服务器的 IP 限制
+            st.markdown(f"![剧情配图]({chat['image_url']})")
 
 # --- 游戏逻辑 ---
 if st.session_state.hp <= 0:
@@ -102,8 +104,8 @@ if not st.session_state.game_over:
         if god_command:
             st.session_state.history.append({"role": "user", "content": f"**神谕：** {god_command}"})
 
-        with st.spinner("命运生成中..."):
-            # 1. 写故事
+        with st.spinner("剧情生成中..."):
+            # 1. Story AI
             story_prompt = f"""
             你是一个无限流游戏DM。副本：{scenario}。
             主角：{player_a} (HP:{st.session_state.hp})。同伴：{player_b}。
@@ -112,7 +114,7 @@ if not st.session_state.game_over:
             【前情】：{memory_text}
             【指令】：{instruction}
             
-            要求：200字内。剧情紧凑，画面感强。
+            要求：200字内。剧情紧凑。
             """
             
             try:
@@ -123,15 +125,14 @@ if not st.session_state.game_over:
                 )
                 story_content = story_res.choices[0].message.content
                 
-                # 2. 算数值 + 生成画图指令
+                # 2. Logic AI + Prompt
                 logic_prompt = f"""
                 阅读剧情：'''{story_content}'''
                 
-                请完成两件事：
-                1. 分析数值变化 (HP, 羁绊, 物品)。
-                2. 将剧情概括为一句【英文绘画提示词】(image_prompt)。包含风格（如 cinematic, 8k, dark lighting）。
+                1. 分析数值变化。
+                2. 概括一句【英文绘画提示词】(image_prompt)。
                 
-                严格输出 JSON 格式：
+                JSON格式：
                 {{
                     "hp_change": 0,
                     "bond_change": 0,
@@ -159,13 +160,13 @@ if not st.session_state.game_over:
                 new_item = data.get("new_item")
                 if new_item: st.session_state.inventory.append(new_item)
 
-                # --- 3. 生成图片 (防封号修复版) ---
-                image_prompt = data.get("image_prompt", f"{scenario} scene, cinematic")
+                # --- 3. 生成图片URL (参数增强版) ---
+                image_prompt = data.get("image_prompt", f"{scenario} scene")
                 encoded_prompt = urllib.parse.quote(image_prompt)
                 
-                # 关键修改：加入随机种子(seed) 和 模型参数(flux)
-                seed = random.randint(0, 100000) 
-                image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=512&nologo=true&seed={seed}&model=flux"
+                # 增加 private=true 防止被公共流捕捉，nologo=true 去水印
+                seed = random.randint(0, 999999) 
+                image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=512&nologo=true&private=true&model=flux&seed={seed}"
 
                 st.session_state.history.append({
                     "role": "assistant", 
