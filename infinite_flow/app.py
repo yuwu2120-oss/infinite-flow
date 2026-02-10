@@ -14,55 +14,54 @@ except Exception:
 
 client = OpenAI(api_key=API_KEY, base_url=BASE_URL)
 
-# --- CSS 豪华装修 (直接贴在 set_page_config 下面) ---
+# --- CSS 修复版 (高对比度) ---
 st.markdown("""
 <style>
-    /* 1. 全局暗黑背景微调 */
+    /* 1. 全局配置 */
     .stApp {
-        background-color: #0e1117;
-        color: #fafafa;
+        background-color: #0e1117; /* 深空灰背景 */
+        color: #ffffff; /* 全局白字 */
     }
     
-    /* 2. 侧边栏美化 */
-    section[data-testid="stSidebar"] {
-        background-color: #262730;
-        border-right: 1px solid #464b59;
-    }
-    
-    /* 3. 聊天气泡优化 */
-    .stChatMessage {
-        background-color: transparent;
-        border-radius: 10px;
-        padding: 10px;
-        margin-bottom: 10px;
-    }
-    
-    /* 给主角（User）的气泡加个深色背景 */
-    div[data-testid="stChatMessage"]:nth-child(odd) {
-        background-color: #1f2937; /* 深蓝灰色 */
-        border: 1px solid #374151;
-    }
-    
-    /* 给AI（剧情）的气泡加个暗红色微光（更有氛围） */
-    div[data-testid="stChatMessage"]:nth-child(even) {
-        background-color: #2b1d1d; /* 暗红色调 */
-        border: 1px solid #450a0a;
+    /* 2. 暴力强制修改所有文本颜色 (解决看不清的问题) */
+    p, .stMarkdown, div[data-testid="stMarkdownContainer"] {
+        color: #ffffff !important;
     }
 
-    /* 4. 进度条颜色 */
-    .stProgress > div > div > div > div {
-        background-image: linear-gradient(to right, #ef4444, #b91c1c);
+    /* 3. 聊天气泡 - 增加辨识度 */
+    div[data-testid="stChatMessage"] {
+        padding: 15px;
+        border-radius: 10px;
+        margin-bottom: 10px;
+        color: #ffffff !important; /* 气泡内文字强制白 */
     }
     
-    /* 5. 物品栏卡片 */
+    /* 主角气泡：深蓝色背景 */
+    div[data-testid="stChatMessage"]:nth-child(odd) {
+        background-color: #172554; 
+        border: 1px solid #3b82f6;
+    }
+    
+    /* AI气泡：深灰色背景 */
+    div[data-testid="stChatMessage"]:nth-child(even) {
+        background-color: #262626; 
+        border: 1px solid #525252;
+    }
+
+    /* 4. 侧边栏 */
+    section[data-testid="stSidebar"] {
+        background-color: #1a1c24;
+    }
+    
+    /* 5. 物品栏样式 */
     .inventory-item {
-        background-color: #374151;
+        background-color: #334155;
+        color: #fbbf24 !important; /* 金色字体 */
         padding: 5px 10px;
         border-radius: 5px;
         margin-bottom: 5px;
-        border-left: 3px solid #f59e0b;
+        border: 1px solid #f59e0b;
         font-family: monospace;
-        font-size: 0.9em;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -222,4 +221,5 @@ if not st.session_state.game_over:
                 # 如果 AI 偶尔发疯，我们不仅报错，还打印出来方便调试
                 print(f"Logic Error: {e}")
                 st.rerun()
+
 
