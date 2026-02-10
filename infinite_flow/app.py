@@ -31,8 +31,7 @@ st.markdown("""
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         font-weight: 500;
     }
-    /* 图片圆角样式 */
-    img { border-radius: 10px; margin-top: 10px; margin-bottom: 10px; }
+    img { border-radius: 10px; margin-top: 10px; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
     p, h1, h2, h3, .stMarkdown { color: #1a1a1a !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -62,10 +61,14 @@ with st.sidebar:
         st.caption("空空如也...")
 
     st.divider()
+    # --- 新增：配图开关 (如果报错可以关掉) ---
+    enable_image = st.checkbox("🖼️ 开启AI配图", value=True, help="如果出现二维码或报错，请关闭此选项")
+    
+    st.divider()
     is_started = len(st.session_state.history) > 0
     player_a = st.text_input("主角名", value="叶凡", disabled=is_started)
     player_b = st.text_input("同伴名", value="Eve", disabled=is_started)
-    scenario = st.selectbox("选择副本", ["丧尸围城的超市", "午夜的泰坦尼克号", "修仙界的兽潮", "赛博朋克不夜城"], disabled=is_started)
+    scenario = st.selectbox("选择副本", ["丧尸围城的超市", "午夜的泰坦尼克号", "修仙界的兽潮", "赛博朋克不夜城", "秦始皇陵"], disabled=is_started)
     
     if st.button("🔄 重置世界"):
         st.session_state.clear()
@@ -78,9 +81,8 @@ for chat in st.session_state.history:
     avatar = "⚡️" if chat["role"] == "user" else "🤖"
     with st.chat_message(chat["role"], avatar=avatar):
         st.markdown(chat["content"])
-        if "image_url" in chat:
-            # --- 关键修改：用 Markdown 语法显示图片 ---
-            # 这样会让你的浏览器直接去加载图片，绕过 Streamlit 服务器的 IP 限制
+        # 只有当开关开启，且有图片链接时才显示
+        if enable_image and "image_url" in chat:
             st.markdown(f"![剧情配图]({chat['image_url']})")
 
 # --- 游戏逻辑 ---
@@ -104,7 +106,7 @@ if not st.session_state.game_over:
         if god_command:
             st.session_state.history.append({"role": "user", "content": f"**神谕：** {god_command}"})
 
-        with st.spinner("剧情生成中..."):
+        with st.spinner("命运计算中..."):
             # 1. Story AI
             story_prompt = f"""
             你是一个无限流游戏DM。副本：{scenario}。
@@ -125,7 +127,7 @@ if not st.session_state.game_over:
                 )
                 story_content = story_res.choices[0].message.content
                 
-                # 2. Logic AI + Prompt
+                # 2. Logic AI
                 logic_prompt = f"""
                 阅读剧情：'''{story_content}'''
                 
@@ -137,7 +139,7 @@ if not st.session_state.game_over:
                     "hp_change": 0,
                     "bond_change": 0,
                     "new_item": null,
-                    "image_prompt": "A cinematic shot of..."
+                    "image_prompt": "cinematic shot of..."
                 }}
                 """
                 
@@ -160,13 +162,14 @@ if not st.session_state.game_over:
                 new_item = data.get("new_item")
                 if new_item: st.session_state.inventory.append(new_item)
 
-                # --- 3. 生成图片URL (参数增强版) ---
-                image_prompt = data.get("image_prompt", f"{scenario} scene")
-                encoded_prompt = urllib.parse.quote(image_prompt)
-                
-                # 增加 private=true 防止被公共流捕捉，nologo=true 去水印
-                seed = random.randint(0, 999999) 
-                image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=512&nologo=true&private=true&model=flux&seed={seed}"
+                # --- 3. 图片生成 (Turbo模式) ---
+                image_url = ""
+                if enable_image:
+                    image_prompt = data.get("image_prompt", f"{scenario} scene")
+                    encoded_prompt = urllib.parse.quote(image_prompt)
+                    # 关键修改：使用 turbo 模型，去掉 private 参数（减少限制触发）
+                    seed = random.randint(0, 1000000)
+                    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=800&height=400&nologo=true&model=turbo&seed={seed}"
 
                 st.session_state.history.append({
                     "role": "assistant", 
