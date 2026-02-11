@@ -98,8 +98,8 @@ with st.sidebar:
     
     # --- 3. 副本选择 (合并官方+自定义) ---
     is_started = len(st.session_state.history) > 0
-    player_a = st.text_input("主角名", value="叶凡", disabled=is_started)
-    player_b = st.text_input("同伴名", value="Eve", disabled=is_started)
+    player_a = st.text_input("冒险者", value="叶凡(腹黑，搞笑，正义感)", disabled=is_started)
+    player_b = st.text_input("伙伴", value="Eve(聪明，善良)", disabled=is_started)
     
     # 合并列表
     official_worlds = ["丧尸围城的超市", "汉朝", "西游世界", "秦始皇陵", "深海考察站"]
@@ -158,7 +158,7 @@ if not st.session_state.game_over:
         if god_command:
             st.session_state.history.append({"role": "user", "content": f"**神谕：** {god_command}"})
 
-        with st.spinner("命运计算中..."):
+        with st.spinner("命运演化中..."):
             # Story AI (注入了自定义世界观！)
             story_prompt = f"""
             你是一个无限流游戏DM。
@@ -225,4 +225,5 @@ if not st.session_state.game_over:
             except Exception as e:
                 print(f"Logic Error: {e}")
                 st.rerun()
+
 
